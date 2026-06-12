@@ -1409,6 +1409,100 @@ static ssize_t smart_chg_show(struct class *c,
 	return scnprintf(buf, PAGE_SIZE, "%u\n", pst->prop[XM_PROP_SMART_CHG]);
 }
 static CLASS_ATTR_RW(smart_chg);
+
+static ssize_t fastcharge_enable_store(struct class *c,
+                struct class_attribute *attr,
+                const char *buf, size_t count)
+{
+        struct battery_chg_dev *bcdev =
+                container_of(c, struct battery_chg_dev, battery_class);
+        int mode;
+        int rc;
+
+        if (kstrtoint(buf, 10, &mode))
+                return -EINVAL;
+
+        switch (mode) {
+        case 0:
+                rc = write_property_id(bcdev,
+                                &bcdev->psy_list[PSY_TYPE_XM],
+                                XM_PROP_SMART_CHG, 0x8);
+                if (rc < 0)
+                        return rc;
+
+                rc = write_property_id(bcdev,
+                                &bcdev->psy_list[PSY_TYPE_XM],
+                                XM_PROP_SPORT_MODE, 0);
+                if (rc < 0)
+                        return rc;
+                break;
+
+        case 1:
+                rc = write_property_id(bcdev,
+                                &bcdev->psy_list[PSY_TYPE_XM],
+                                XM_PROP_SMART_CHG, 0x9);
+                if (rc < 0)
+                        return rc;
+
+                rc = write_property_id(bcdev,
+                                &bcdev->psy_list[PSY_TYPE_XM],
+                                XM_PROP_SPORT_MODE, 0);
+                if (rc < 0)
+                        return rc;
+                break;
+
+        case 2:
+                rc = write_property_id(bcdev,
+                                &bcdev->psy_list[PSY_TYPE_XM],
+                                XM_PROP_SMART_CHG, 0x9);
+                if (rc < 0)
+                        return rc;
+
+                rc = write_property_id(bcdev,
+                                &bcdev->psy_list[PSY_TYPE_XM],
+                                XM_PROP_SPORT_MODE, 1);
+                if (rc < 0)
+                        return rc;
+                break;
+
+        default:
+                return -EINVAL;
+        }
+
+        return count;
+}
+
+static ssize_t fastcharge_enable_show(struct class *c,
+                struct class_attribute *attr, char *buf)
+{
+        struct battery_chg_dev *bcdev =
+                container_of(c, struct battery_chg_dev, battery_class);
+        struct psy_state *pst = &bcdev->psy_list[PSY_TYPE_XM];
+        u32 sport_mode, smart_chg;
+        int rc, mode;
+
+        rc = read_property_id(bcdev, pst, XM_PROP_SPORT_MODE);
+        if (rc < 0)
+                return rc;
+        sport_mode = pst->prop[XM_PROP_SPORT_MODE];
+
+        rc = read_property_id(bcdev, pst, XM_PROP_SMART_CHG);
+        if (rc < 0)
+                return rc;
+        smart_chg = pst->prop[XM_PROP_SMART_CHG];
+
+        if (sport_mode == 1)
+                mode = 2;
+        else if (smart_chg == 8)
+                mode = 1;
+        else
+                mode = 0;
+
+        return scnprintf(buf, PAGE_SIZE, "%d\n", mode);
+}
+
+static CLASS_ATTR_RW(fastcharge_enable);
+
 #endif /* !CONFIG_MI_CHARGER_M81 */
 
 #define BSWAP_32(x) \
@@ -5056,6 +5150,7 @@ static struct attribute *xiaomi_battery_class_attrs[] = {
 	&class_attr_smart_batt.attr,
 #ifndef CONFIG_MI_CHARGER_M81
 	&class_attr_smart_chg.attr,
+        &class_attr_fastcharge_enable.attr,
 #endif /* !CONFIG_MI_CHARGER_M81 */
 	&class_attr_shipmode_count_reset.attr,
 	&class_attr_sport_mode.attr,
